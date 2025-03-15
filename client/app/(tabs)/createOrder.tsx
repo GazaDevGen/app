@@ -1,22 +1,53 @@
-import { StyleSheet, Text, TextInput, View, ScrollView, TouchableOpacity } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
 import { useEffect, useState } from "react";
 import TextInputDiv from "@/components/TextInputDiv";
 import CircleButton from "@/components/CircleButton";
 import { Image } from "expo-image";
 
-import * as ImagePicker from 'expo-image-picker'
-import * as MediaLibrary from 'expo-media-library'
+import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import axios from "axios";
 import Toast from "react-native-toast-message";
-import Constants from 'expo-constants';
-import { useRouter } from "expo-router";
+import Constants from "expo-constants";
+import { useRouter, useNavigation } from "expo-router";
+import { CustomFormData } from "@/CustomFormData";
+
+function formDataFromImagePicker(result: ImagePicker.ImagePickerSuccessResult) {
+  const formData = new FormData();
+  formData.append("customerName", "sdfsdf");
+  formData.append("phone", "123123123");
+
+  for (const index in result.assets) {
+    const asset = result.assets[index];
+
+    // @ts-expect-error: special react native format for form data
+    formData.append(`photos`, {
+      uri: asset.uri,
+      name: asset.fileName ?? asset.uri.split("/").pop(),
+      type: asset.mimeType,
+    });
+
+    if (asset.exif) {
+      formData.append(`exif.${index}`, JSON.stringify(asset.exif));
+    }
+  }
+
+  return formData;
+}
 
 interface Photo {
   uri: string;
   fileName: string;
   type: string;
 }
-const pickedImage = require('../../assets/images/pickerImage.webp')
+const pickedImage = require("../../assets/images/pickerImage.webp");
 type Order = {
   customerName: string;
   dowranAlkhser: number;
@@ -34,21 +65,16 @@ type Order = {
   bookingDay: string;
   receiveDay: string;
   phone: number;
-
-}
-
-import { launchImageLibrary } from "react-native-image-picker";
-
+  photos: [];
+};
 
 const BASE_URL = Constants.expoConfig!.extra!.BASE_URL;
 
-
-
 export default function CreateOrderScreen() {
   const router = useRouter(); // Initialize router
-
+  const navigate = useNavigation<any>();
   const [order, setOrder] = useState<Order>({
-    customerName: '',
+    customerName: "",
     dowranAlkhser: 0,
     dowranAlsdr: 0,
     dowranAlardaf: 0,
@@ -58,110 +84,101 @@ export default function CreateOrderScreen() {
     tolAlsdr: 0,
     tolBloza: 0,
     tolBntlon: 0,
-    description: '',
-    price: '',
-    firstPayment: '',
-    bookingDay: '',
-    receiveDay: '',
+    description: "",
+    price: "",
+    firstPayment: "",
+    bookingDay: "",
+    receiveDay: "",
     phone: 0,
-
+    photos: [],
   });
-  const [photos, setPhotos] = useState<Photo[]>([])
+  const [assets, setAssets] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
-  const [permissionResponse, requestPermission] = MediaLibrary.usePermissions()
-
-
-
+  const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
 
   const clearPickedImages = () => {
-    setPhotos([])
-  }
+    setAssets([]);
+  };
+
   const pickImageAsync = async () => {
     const options = {
       mediaType: MediaLibrary.MediaType.photo,
       selectionLimit: 10, // Allow multiple images
+      allowsMultipleSelection: true,
     };
 
-    launchImageLibrary(options, (response) => {
-      console.log(response.assets);
+    try {
+      const x = await ImagePicker.launchImageLibraryAsync(options);
+      if (!x || !x.assets || x.assets.length === 0) return;
 
-      if (response.assets) {
-        setPhotos(response.assets.map(asset => ({
-          uri: asset.uri,
-          fileName: asset.fileName || `photo_${Date.now()}.jpg`,
-          type: asset.type || "image/jpeg",
-        }) as any));
-      }
-    });
-
+      setAssets(x.assets);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
-
-
   const createOrder = async () => {
-    console.log('am here');
+    console.log("am here");
 
     try {
-      if (order.customerName === '') {
+      if (order.customerName === "") {
         Toast.show({
-          type: 'error',
-          text1: 'يجب ان تضيف اسم الزبون',
-          text2: 'لم تقم باضافة اسم زبون الطلب',
-          position: 'bottom',
+          type: "error",
+          text1: "يجب ان تضيف اسم الزبون",
+          text2: "لم تقم باضافة اسم زبون الطلب",
+          position: "bottom",
         });
         return;
       }
 
-      const formData = new FormData();
+      const formData = new CustomFormData();
+
+      let i = 0;
+
+      for (const asset of assets) {
+        // @ts-expect-error: special react native format for form data
+        formData.append(`photos.${i++}`, {
+          uri: asset.uri,
+          name: asset.fileName,
+          type: asset.mimeType,
+        });
+      }
 
       Object.keys(order).forEach((key) => {
-        if (key !== 'photos') {
+        if (key !== "photos") {
+          //@ts-ignore
           formData.append(key, String(order[key]));
         }
       });
 
-      photos.forEach((photo, index) => {
-        console.log("🚀 ~ photos.forEach ~ photo:", photo)
-        formData.append("photos", {
-          uri: photo.uri,
-          name: `photo_${index}.jpg`,
-          type: "image/jpeg",
-        } as any);
-      });
-
-
       const response = await axios.post(`${BASE_URL}/api/orders`, formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
 
       if (response.status === 201) {
         Toast.show({
-          type: 'success',
-          text1: 'تم اضافة الطلب بنجاح',
+          type: "success",
+          text1: "تم اضافة الطلب بنجاح",
           text2: `تم اضافة طلب ${order.customerName} بنجاح`,
-          position: 'bottom',
+          position: "bottom",
         });
-        // setTimeout(() => {
-        //   router.push('/');
-        // }, 1000);
+        setTimeout(() => {
+          navigate.navigate("index");
+        }, 1000);
       } else {
         Toast.show({
-          type: 'error',
-          text1: 'فشل في ارسال الطلب',
+          type: "error",
+          text1: "فشل في ارسال الطلب",
           text2: `هناك خطا ما حدث اثناء اضافة الطلب`,
-          position: 'bottom',
+          position: "bottom",
         });
       }
     } catch (error: any) {
-      console.error('🚀 ~ createOrder ~ error:', error);
-
+      console.error("🚀 ~ createOrder ~ error:", error);
     }
   };
-
-
-
 
   //   try {
 
@@ -228,9 +245,9 @@ export default function CreateOrderScreen() {
   // };
   useEffect(() => {
     if (!permissionResponse?.granted) {
-      requestPermission()
+      requestPermission();
     }
-  }, [])
+  }, []);
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -242,10 +259,8 @@ export default function CreateOrderScreen() {
           text="اسم الزبون"
           placeholder="اكتب اسم الزبون"
           placeholderTextColor="#aaa"
-          keyboardType='text'
+          keyboardType="text"
         />
-
-
 
         <View style={styles.inputsGroup}>
           <TextInputDiv
@@ -254,8 +269,7 @@ export default function CreateOrderScreen() {
             text="رقم الجوال"
             placeholder="اكتب رقم الجوال"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
           <TextInputDiv
             value={String(order.tolBntlon)}
@@ -263,10 +277,8 @@ export default function CreateOrderScreen() {
             text="طول البنطلون"
             placeholder="اكتب طول البنطلون"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
-
         </View>
 
         <View style={styles.inputsGroup}>
@@ -276,8 +288,7 @@ export default function CreateOrderScreen() {
             text="دوران الخصر"
             placeholder="اكتب دوران الخصر"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
 
           <TextInputDiv
@@ -286,8 +297,7 @@ export default function CreateOrderScreen() {
             text="دوران الصدر"
             placeholder="اكتب دوران الصدر"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
         </View>
 
@@ -298,8 +308,7 @@ export default function CreateOrderScreen() {
             text="دوران الارداف"
             placeholder="اكتب دوران الارداف"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
 
           <TextInputDiv
@@ -308,12 +317,9 @@ export default function CreateOrderScreen() {
             text="طول الكم"
             placeholder="اكتب طول الكم"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
-
         </View>
-
 
         <View style={styles.inputsGroup}>
           <TextInputDiv
@@ -322,8 +328,7 @@ export default function CreateOrderScreen() {
             text="الكتف"
             placeholder="اكتب الكتف "
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
 
           <TextInputDiv
@@ -332,22 +337,18 @@ export default function CreateOrderScreen() {
             text="طول التونك"
             placeholder="اكتب طول التونك"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
-
         </View>
 
         <View style={styles.inputsGroup}>
-
           <TextInputDiv
             value={String(order.tolAlsdr)}
             setFunction={(text) => setOrder({ ...order, tolAlsdr: text })}
             text="طول الصدر"
             placeholder="اكتب طول الصدر"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
 
           <TextInputDiv
@@ -356,24 +357,18 @@ export default function CreateOrderScreen() {
             text="طول البلوزة"
             placeholder="اكتب طول البلوزة"
             placeholderTextColor="#aaa"
-            keyboardType='numeric'
-
+            keyboardType="numeric"
           />
-
-
         </View>
 
-
         <View style={styles.inputsGroup}>
-
           <TextInputDiv
             value={order.price}
             setFunction={(text) => setOrder({ ...order, price: text })}
             text=" السعر"
             placeholder=" السعر"
             placeholderTextColor="#aaa"
-            keyboardType='text'
-
+            keyboardType="text"
           />
 
           <TextInputDiv
@@ -382,23 +377,18 @@ export default function CreateOrderScreen() {
             text="دفعة اولى"
             placeholder=" اكتب الدفعة الاولى"
             placeholderTextColor="#aaa"
-            keyboardType='text'
-
+            keyboardType="text"
           />
-
         </View>
 
-
         <View style={styles.inputsGroup}>
-
           <TextInputDiv
             value={order.bookingDay}
             setFunction={(text) => setOrder({ ...order, bookingDay: text })}
             text="يوم الحجز"
             placeholder=" اكتب يوم الحجز"
             placeholderTextColor="#aaa"
-            keyboardType='text'
-
+            keyboardType="text"
           />
 
           <TextInputDiv
@@ -407,16 +397,9 @@ export default function CreateOrderScreen() {
             text="يوم الاستلام"
             placeholder=" اكتب يوم الاستلام"
             placeholderTextColor="#aaa"
-            keyboardType='text'
-
+            keyboardType="text"
           />
-
         </View>
-
-
-
-
-
 
         {/* Order Details Field */}
         <View style={styles.textareaWrapper}>
@@ -429,7 +412,6 @@ export default function CreateOrderScreen() {
             numberOfLines={5}
             value={order.description} // Make sure to bind this to the correct state
             onChangeText={(text) => setOrder({ ...order, description: text })}
-
           />
         </View>
         <View style={styles.imageContainer}>
@@ -438,42 +420,34 @@ export default function CreateOrderScreen() {
             showsHorizontalScrollIndicator={true}
             contentContainerStyle={styles.imageScroll}
           >
-            {
-              photos.length >= 1 ?
-                photos.map((uri, index) => (
-                  <Image key={index} source={uri || pickedImage} style={{ width: 353, height: '100%' }} />
-                ))
-                :
-                <Image source={pickedImage} style={{ width: 353, height: '100%' }} />
-
-            }
+            {assets.length >= 1 ? (
+              assets.map((uri, index) => (
+                <Image
+                  key={index}
+                  source={uri || pickedImage}
+                  style={{ width: 353, height: "100%" }}
+                />
+              ))
+            ) : (
+              <Image
+                source={pickedImage}
+                style={{ width: 353, height: "100%" }}
+              />
+            )}
           </ScrollView>
         </View>
 
-
-
-
         <View style={styles.pickBtnsContainer}>
-          <CircleButton
-            iconName="lock-reset"
-            onPress={clearPickedImages} />
-          <CircleButton
-            iconName="add-a-photo"
-            onPress={pickImageAsync} />
-
+          <CircleButton iconName="lock-reset" onPress={clearPickedImages} />
+          <CircleButton iconName="add-a-photo" onPress={pickImageAsync} />
         </View>
-
 
         {/* Submit Button */}
         <View>
-          <TouchableOpacity style={styles.button}>
-            <Text
-              onPress={createOrder}
-              style={styles.buttonText}
-            >إرسال الطلب</Text>
+          <TouchableOpacity style={styles.button} onPress={createOrder}>
+            <Text style={styles.buttonText}>إرسال الطلب</Text>
           </TouchableOpacity>
         </View>
-
       </View>
       <Toast />
     </ScrollView>
@@ -484,7 +458,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingBottom: 20,
-    backgroundColor: 'black'
+    backgroundColor: "black",
   },
   mainContainer: {
     padding: 20,
@@ -496,35 +470,35 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     textAlignVertical: "top",
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
+    backgroundColor: "#1e1e1e",
+    color: "#fff",
     padding: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: "#444",
     width: "100%",
   },
   button: {
-    backgroundColor: '#ffcc00',
+    backgroundColor: "#ffcc00",
     padding: 10,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 20,
     width: "70%",
-    margin: 'auto'
+    margin: "auto",
   },
   buttonText: {
-    color: '#000',
+    color: "#000",
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   inputsGroup: {
-    gap: 7
+    gap: 7,
   },
   label: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 5,
   },
   imageContainer: {
@@ -532,12 +506,11 @@ const styles = StyleSheet.create({
   },
   imageScroll: {
     paddingBottom: 2,
-    backgroundColor: '#ffcc00',
-
+    backgroundColor: "#ffcc00",
   },
   pickBtnsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center'
-  }
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    alignItems: "center",
+  },
 });

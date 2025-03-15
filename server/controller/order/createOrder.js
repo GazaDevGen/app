@@ -2,7 +2,6 @@ import Order from "../../database/order/orderSchema.js";
 
 const createOrder = async (req, res) => {
   try {
-
     // Extract order data from the request body
     const {
       customerName,
@@ -22,14 +21,18 @@ const createOrder = async (req, res) => {
       receiveDay,
       phone,
     } = req.body;
-      console.log("🚀 ~ createOrder ~ customerName:", customerName)
+    console.log("HERE", req.files);
+    console.log("🚀 ~ createOrder ~ customerName:", customerName);
 
     if (!customerName || !phone) {
-      return res.status(400).json({ msg: 'Customer name and phone are required' });
+      return res
+        .status(400)
+        .json({ msg: "Customer name and phone are required" });
     }
-    console.log("🚀 ~ createOrder ~ photos:", req.files)
 
     const photos = req.files.map((file) => file);
+
+    console.log(photos);
 
     await Order.create({
       customerName,
@@ -52,11 +55,12 @@ const createOrder = async (req, res) => {
     });
 
     // Return success response
-    return res.status(201).json({ msg: 'Order created successfully' });
-
+    return res.status(201).json({ msg: "Order created successfully" });
   } catch (error) {
-    console.error('Error creating order:', error);
-    return res.status(500).json({ msg: 'Failed to create order', error: error.message });
+    console.error("Error creating order:", error);
+    return res
+      .status(500)
+      .json({ msg: "Failed to create order", error: error.message });
   }
 };
 

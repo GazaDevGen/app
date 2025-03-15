@@ -1,5 +1,21 @@
-import { createOrder, deleteOrder, getOrder, getOrders, updateOrder, updateOrderPhotos, updateOrderStatus } from "./order/index.js";
-import { deleteUser, getUser, login, logout, signup, updatePassword, updateUser } from "./user/index.js";
+import {
+  createOrder,
+  deleteOrder,
+  getOrder,
+  getOrders,
+  updateOrder,
+  updateOrderPhotos,
+  updateOrderStatus,
+} from "./order/index.js";
+import {
+  deleteUser,
+  getUser,
+  login,
+  logout,
+  signup,
+  updatePassword,
+  updateUser,
+} from "./user/index.js";
 
 export {
   signup,
@@ -15,11 +31,5 @@ export {
   updateOrder,
   updateOrderStatus,
   updateOrderPhotos,
-  deleteOrder
-
-
-
-
-
-}
-
+  deleteOrder,
+};
